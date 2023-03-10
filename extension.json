@@ -1,0 +1,9 @@
+{
+    "extension_api": 1,
+    "name": "Unreal Doc",
+    "version": "0.1",
+    "minimum_renderdoc": "1.2",
+    "description": "Set of useful tools for debuging and analysing Unreal Engine.",
+    "author": "KenLee <hellokenlee@163.com>",
+    "url": "http://git-internal.nie.netease.com/gzlixiaoliang/unrealdoc"
+}
