@@ -4,6 +4,8 @@
 
 import qrenderdoc
 
+from typing import *
+
 
 class Singleton(type):
 	"""Singletone Meta Class
@@ -23,7 +25,7 @@ class Registerable(object):
 
 	def __init__(self):
 		super(Registerable, self).__init__()
-		self.context = None
+		self.context: Optional[qrenderdoc.CaptureContext] = None
 		self.registered = False
 		pass
 

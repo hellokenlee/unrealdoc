@@ -40,11 +40,11 @@ pyechart_lib_path = LOCAL_PYTHON36_PATH + '\\lib'
 pyechart_package_path = LOCAL_PYTHON36_PATH + '\\lib\\site-packages'
 pyechart_dll_path = LOCAL_PYTHON36_PATH + '\\DLLs'
 if pyechart_lib_path not in sys.path:
-	sys.path.append(pyechart_lib_path)
+    sys.path.append(pyechart_lib_path)
 if pyechart_package_path not in sys.path:
-	sys.path.append(pyechart_package_path)
+    sys.path.append(pyechart_package_path)
 if pyechart_dll_path not in sys.path:
-	sys.path.append(pyechart_dll_path)
+    sys.path.append(pyechart_dll_path)
 from pyecharts.charts import Pie
 from pyecharts.charts import Tab
 from pyecharts import options as opts
@@ -52,11 +52,10 @@ from pyecharts.commons.utils import JsCode
  
 # Import renderdoc if not already imported (e.g. in the UI)
 if 'renderdoc' not in sys.modules and '_renderdoc' not in sys.modules:
-	import renderdoc
+    import renderdoc
 
 # Alias renderdoc for legibility
-rd = renderdoc
-pyrd = pyrenderdoc
+rd = sys.modules["renderdoc"]
 
 table_sort_function = '''
 <script type="text/javascript" src="./thirdparty/jquery-1.7.2.min.js"></script>
@@ -191,8 +190,8 @@ class DrawCall:
 
 
 class MeshData(rd.MeshFormat):
-	indexOffset = 0
-	name = ''
+    indexOffset = 0
+    name = ''
 
 
 class Mesh:
@@ -217,7 +216,6 @@ class Mesh:
         self.drawcall += 1
         self.IDs.append(item.eventId)
         self.passes_name.append(item.pass_name)
-    
 
 
 # ============ Global Values =================================
@@ -251,7 +249,6 @@ def find_events_tree_entry(controller, root):
             return entry
 
 
-
 def iterator_actions(item, controller, pass_name):
     global dc_list    
     global total_drawcall    
@@ -268,13 +265,12 @@ def iterator_actions(item, controller, pass_name):
         iterator_actions(child, controller, pass_name)   
 
 
-
-
 def collect_drawcall_actions(controller):
     global dc_list  
     global total_drawcall    
     root_frame = controller.GetRootActions()
-    root_list = []     
+    root_list = []
+    entry =""
     if ROOT_NAME == "":
         root_list = root_frame
     else:
@@ -298,7 +294,6 @@ def collect_drawcall_actions(controller):
                 new_dc = DrawCall(child, "OthersPass", "OthersPass")
                 dc_list.append(new_dc)
         iterator_actions(child, controller, pass_name)
-
 
 
 # Get a list of MeshData objects describing the vertex inputs at this draw
@@ -341,71 +336,66 @@ def get_mesh_inputs(controller, mesh):
     return meshInputs
 
 
-
 def get_indices(controller, mesh):
-	# Get the character for the width of index
-	indexFormat = 'B'
-	if mesh.indexByteStride == 2:
-		indexFormat = 'H'
-	elif mesh.indexByteStride == 4:
-		indexFormat = 'I'
-
-	# Duplicate the format by the number of indices
-	indexFormat = str(mesh.numIndices) + indexFormat
-
-	# If we have an index buffer
-	if mesh.indexResourceId != rd.ResourceId.Null():
-		# Fetch the data
-		ibdata = controller.GetBufferData(mesh.indexResourceId, mesh.indexByteOffset, 0)
-
-		# Unpack all the indices, starting from the first index to fetch
-		offset = mesh.indexOffset * mesh.indexByteStride
-		indices = struct.unpack_from(indexFormat, ibdata, offset)
-
-		# Apply the baseVertex offset
-		return [i + mesh.baseVertex for i in indices]
-	else:
-		# With no index buffer, just generate a range
-		return tuple(range(mesh.numIndices))
-
+    # Get the character for the width of index
+    indexFormat = 'B'
+    if mesh.indexByteStride == 2:
+        indexFormat = 'H'
+    elif mesh.indexByteStride == 4:
+        indexFormat = 'I'
+    # Duplicate the format by the number of indices
+    indexFormat = str(mesh.numIndices) + indexFormat
+    # If we have an index buffer
+    if mesh.indexResourceId != rd.ResourceId.Null():
+        # Fetch the data
+        ibdata = controller.GetBufferData(mesh.indexResourceId, mesh.indexByteOffset, 0)
+        # Unpack all the indices, starting from the first index to fetch
+        offset = mesh.indexOffset * mesh.indexByteStride
+        indices = struct.unpack_from(indexFormat, ibdata, offset)
+        # Apply the baseVertex offset
+        return [i + mesh.baseVertex for i in indices]
+    else:
+        # With no index buffer, just generate a range
+        return tuple(range(mesh.numIndices))
+    pass
 
 
 def unpack_data(fmt, data):
-	# We don't handle 'special' formats - typically bit-packed such as 10:10:10:2
-	if fmt.Special():
-		raise RuntimeError("Packed formats are not supported!")
+    # We don't handle 'special' formats - typically bit-packed such as 10:10:10:2
+    if fmt.Special():
+        raise RuntimeError("Packed formats are not supported!")
 
-	formatChars = {}
-	#                                 012345678
-	formatChars[rd.CompType.UInt]  = "xBHxIxxxL"
-	formatChars[rd.CompType.SInt]  = "xbhxixxxl"
-	formatChars[rd.CompType.Float] = "xxexfxxxd" # only 2, 4 and 8 are valid
+    formatChars = {}
+    #                                 012345678
+    formatChars[rd.CompType.UInt]  = "xBHxIxxxL"
+    formatChars[rd.CompType.SInt]  = "xbhxixxxl"
+    formatChars[rd.CompType.Float] = "xxexfxxxd" # only 2, 4 and 8 are valid
 
-	# These types have identical decodes, but we might post-process them
-	formatChars[rd.CompType.UNorm] = formatChars[rd.CompType.UInt]
-	formatChars[rd.CompType.UScaled] = formatChars[rd.CompType.UInt]
-	formatChars[rd.CompType.SNorm] = formatChars[rd.CompType.SInt]
-	formatChars[rd.CompType.SScaled] = formatChars[rd.CompType.SInt]
+    # These types have identical decodes, but we might post-process them
+    formatChars[rd.CompType.UNorm] = formatChars[rd.CompType.UInt]
+    formatChars[rd.CompType.UScaled] = formatChars[rd.CompType.UInt]
+    formatChars[rd.CompType.SNorm] = formatChars[rd.CompType.SInt]
+    formatChars[rd.CompType.SScaled] = formatChars[rd.CompType.SInt]
 
-	# We need to fetch compCount components
-	vertexFormat = str(fmt.compCount) + formatChars[fmt.compType][fmt.compByteWidth]
+    # We need to fetch compCount components
+    vertexFormat = str(fmt.compCount) + formatChars[fmt.compType][fmt.compByteWidth]
 
-	# Unpack the data
-	value = struct.unpack_from(vertexFormat, data, 0)
+    # Unpack the data
+    value = struct.unpack_from(vertexFormat, data, 0)
 
-	# If the format needs post-processing such as normalisation, do that now
-	if fmt.compType == rd.CompType.UNorm:
-		divisor = float((2 ** (fmt.compByteWidth * 8)) - 1)
-		value = tuple(float(i) / divisor for i in value)
-	elif fmt.compType == rd.CompType.SNorm:
-		maxNeg = -float(2 ** (fmt.compByteWidth * 8)) / 2
-		divisor = float(-(maxNeg-1))
-		value = tuple((float(i) if (i == maxNeg) else (float(i) / divisor)) for i in value)
+    # If the format needs post-processing such as normalisation, do that now
+    if fmt.compType == rd.CompType.UNorm:
+        divisor = float((2 ** (fmt.compByteWidth * 8)) - 1)
+        value = tuple(float(i) / divisor for i in value)
+    elif fmt.compType == rd.CompType.SNorm:
+        maxNeg = -float(2 ** (fmt.compByteWidth * 8)) / 2
+        divisor = float(-(maxNeg-1))
+        value = tuple((float(i) if (i == maxNeg) else (float(i) / divisor)) for i in value)
 
-	# If the format is BGRA, swap the two components
-	if fmt.BGRAOrder():
-		value = tuple(value[i] for i in [2, 1, 0, 3])
-	return value
+    # If the format is BGRA, swap the two components
+    if fmt.BGRAOrder():
+        value = tuple(value[i] for i in [2, 1, 0, 3])
+    return value
 
 
 def compare_mesh_data(controller, indicesA, indicesB, dataA, dataB):
@@ -434,7 +424,6 @@ def compare_mesh_data(controller, indicesA, indicesB, dataA, dataB):
                         if not result:
                             return False
     return True
-
 
 
 def calculate_mesh_drawcall(controller):
@@ -526,7 +515,6 @@ def calculate_mesh_drawcall(controller):
                     remain_isntances[remain_instance] -= instance_mesh.draw.numInstances
 
 
-
 def render_pie_chart(name_value_list, total_value, mesh_dc_path):
     # Sort according to triangles number
     name_value_pair = sorted(name_value_list, key=lambda x:x[1])
@@ -604,7 +592,6 @@ def render_pie_chart(name_value_list, total_value, mesh_dc_path):
         pie.render(mesh_dc_path) 
 
 
-
 # Fillin excel table 
 def fillin_excel_table(html_path, html_title, table_content, is_top_level, total_drawcall):
     html_head = ("<h1 style='background-color:#5cc27d; color: #FFFFFF; font-size: 40px; padding: 20px 0 5px 5px;'>%s</h1>\n" % html_title)
@@ -634,7 +621,6 @@ def fillin_excel_table(html_path, html_title, table_content, is_top_level, total
     html.close()
 
 
-
 def calculate_relative_html_name(item):
     global filenames
     global g_file_index
@@ -649,7 +635,6 @@ def calculate_relative_html_name(item):
     filenames.append(filename)
     relative_filename = str(filename).replace(str(g_assetsfolder), ".")
     return relative_filename
-
 
 
 def write_mesh_data_frame():
@@ -683,7 +668,6 @@ def write_mesh_data_frame():
     fillin_excel_table(mesh_dc_path, "Mesh Drawcall Analysis", table_content, True, total_drawcall)
 
 
-
 def write_mesh_detail_frame(detail):
     global g_file_index
     filename = detail.html_name
@@ -697,12 +681,11 @@ def write_mesh_detail_frame(detail):
     fillin_excel_table(filename, ("%s" % detail.show_name), table_content, False, detail.drawcall)
 
 
-
 # Write variable htmls
 def write_frame_overview(controller):
-    #collect all drawcall actions
+    # collect all drawcall actions
     collect_drawcall_actions(controller)
-    #calculate mesh drawcall
+    # calculate mesh drawcall
     calculate_mesh_drawcall(controller)
     
     write_mesh_data_frame()
@@ -710,63 +693,64 @@ def write_frame_overview(controller):
         write_mesh_detail_frame(mesh)
     # Ending tip
     print("Finished!")
-    
+
+
+def create_result_folder():
+    global g_absoulte
+    global g_assetsfolder
+    global g_detailfolder
+    g_absoulte = WindowsPath(RDC_FILE).absolute()
+    file_name = g_absoulte.stem + "_MeshReport"
+    g_assetsfolder = g_absoulte.parent / file_name
+    print("File Path:%s\n" % g_assetsfolder)
+    g_assetsfolder.mkdir(parents=True, exist_ok=True)
+    g_detailfolder = g_assetsfolder / 'Detail'
+    if os.path.exists(g_detailfolder):
+        shutil.rmtree(g_detailfolder)
+    g_detailfolder.mkdir(parents=True, exist_ok=True)
 
 
 def load_capture(filename):
-	rd.InitialiseReplay(rd.GlobalEnvironment(), [])
-	# Open a capture file handle
-	cap = rd.OpenCaptureFile()
-	# Open a particular file - see also OpenBuffer to load from memory
-	result = cap.OpenFile(filename, '', None)
-	# Make sure the file opened successfully
-	if result != rd.ResultCode.Succeeded:
-		raise RuntimeError("Couldn't open file: " + str(result))
-	# Make sure we can replay
-	if not cap.LocalReplaySupport():
-		raise RuntimeError("Capture cannot be replayed")
-	# Initialise the replay
-	result,controller = cap.OpenCapture(rd.ReplayOptions(), None)
-	if result != rd.ResultCode.Succeeded:
-		raise RuntimeError("Couldn't initialise replay: " + str(result))
-	return cap,controller
+    rd.InitialiseReplay(rd.GlobalEnvironment(), [])
+    # Open a capture file handle
+    cap = rd.OpenCaptureFile()
+    # Open a particular file - see also OpenBuffer to load from memory
+    result = cap.OpenFile(filename, '', None)
+    # Make sure the file opened successfully
+    if result != rd.ResultCode.Succeeded:
+        raise RuntimeError("Couldn't open file: " + str(result))
+    # Make sure we can replay
+    if not cap.LocalReplaySupport():
+        raise RuntimeError("Capture cannot be replayed")
+    # Initialise the replay
+    result,controller = cap.OpenCapture(rd.ReplayOptions(), None)
+    if result != rd.ResultCode.Succeeded:
+        raise RuntimeError("Couldn't initialise replay: " + str(result))
+    return cap,controller
+
+
+def main():
+    global RDC_FILE
+    if 'pyrenderdoc' in globals():
+        if RDC_FILE == "":
+            RDC_FILE = pyrenderdoc.GetCaptureFilename()
+        else:
+            pyrenderdoc.LoadCapture(RDC_FILE, rd.ReplayOptions(), RDC_FILE, False, True)
+        create_result_folder()
+        pyrenderdoc.Replay().BlockInvoke(write_frame_overview)
+    else:
+        if len(sys.argv) <= 1:
+            print('Usage: python3 {} filename.rdc'.format(sys.argv[0]))
+            sys.exit(0)
+        create_result_folder()
+        cap, controller = load_capture(sys.argv[1])  # sys.argv[1] == filePath
+        write_frame_overview(controller)
+
+        controller.Shutdown()
+        cap.Shutdown()
+        rd.ShutdownReplay()
 
 
 if __name__ == "__main__":
-	if 'pyrenderdoc' in globals():
-	    if RDC_FILE == "":
-	        RDC_FILE = pyrenderdoc.GetCaptureFilename()
-	    else:
-	        pyrenderdoc.LoadCapture(RDC_FILE, renderdoc.ReplayOptions(), RDC_FILE, False, True)
-	    g_absoulte = WindowsPath(RDC_FILE).absolute()
-	    file_name = g_absoulte.stem + "_MeshReport"
-	    g_assetsfolder = g_absoulte.parent /file_name
-	    print("File Path:%s\n" %g_assetsfolder)
-	    g_assetsfolder.mkdir(parents = True, exist_ok = True)
-	    g_detailfolder = g_assetsfolder / 'Detail'
-	    if os.path.exists(g_detailfolder):
-	        shutil.rmtree(g_detailfolder)
-	    g_detailfolder.mkdir(parents = True, exist_ok = True)
-	    g_file_index = 0
-	    pyrenderdoc.Replay().BlockInvoke(write_frame_overview)
-	else:
-		if len(sys.argv) <= 1:
-			print('Usage: python3 {} filename.rdc'.format(sys.argv[0]))
-			sys.exit(0)
-		g_absoulte = WindowsPath(RDC_FILE).absolute()
-		file_name = g_absoulte.stem + "_MeshReport"
-		g_assetsfolder = g_absoulte.parent /file_name
-		print("File Path:%s\n" %g_assetsfolder)
-		g_assetsfolder.mkdir(parents = True, existok = True)
-		g_detailfolder = g_assetsfolder / 'Detail'
-		if os.path.exists(g_detailfolder):
-			shutil.rmtree(g_detailfolder)
-		g_detailfolder.mkdir(parents = True, exist_ok = True)
-		g_file_index = 0
-		cap,controller = load_capture(sys.argv[1])
-		write_frame_overview(controller)
-
-		controller.Shutdown()
-		cap.Shutdown()
-		rd.ShutdownReplay()
-	pass
+    main()
+    pass

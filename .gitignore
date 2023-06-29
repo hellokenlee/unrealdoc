@@ -2,3 +2,4 @@
 .dbg/
 *.pyc
 layout.bin
+settings.json

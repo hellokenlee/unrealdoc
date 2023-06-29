@@ -6,7 +6,7 @@ import os
 import sys
 
 DLL_PATH = os.path.join(os.path.dirname(__file__), "../.dbg/dlls")
-EGG_PATH = os.path.join(os.path.dirname(__file__), "../.dbg/pydevd-pycharm.egg")
+EGG_PATH = os.path.join(os.path.dirname(__file__), "../.dbg/pydevd-pycharm")
 
 
 def connect_debug_server(enable):
@@ -24,7 +24,7 @@ def connect_debug_server(enable):
 
 	# noinspection PyUnresolvedReferences
 	import pydevd_pycharm
-	pydevd_pycharm.settrace('localhost', port=1091, stdoutToServer=True, stderrToServer=True, suspend=False)
+	pydevd_pycharm.settrace('localhost', port=9123, stdoutToServer=True, stderrToServer=True, suspend=False)
 	print("[Debug] Info: Connected to pycharm debugger.")
 	pass
 

@@ -6,8 +6,10 @@ import os
 import pickle
 
 from typing import Optional, List
-from qrenderdoc import CaptureContext, CaptureViewer, DockReference, PersistantConfig
+from qrenderdoc import CaptureContext, CaptureViewer, DockReference
 
+from .tools.utils import Utils
+from .tools.settings import Settings
 from .tools.tool_base import ToolBase
 
 
@@ -18,7 +20,7 @@ class UnrealDocViewer(CaptureViewer):
 
 		self.mqt = context.Extensions().GetMiniQtHelper()
 		self.context = context
-		self.window = self.mqt.CreateToplevelWidget("Unreal Toolbox", lambda c, w, d: UnrealDocViewerManager.on_window_closed())
+		self.window = self.mqt.CreateToplevelWidget("UnrealDoc", lambda c, w, d: UnrealDocViewerManager.on_window_closed())
 		self.context.AddCaptureViewer(self)
 		self.layout = self.mqt.CreateVerticalContainer()
 		self.mqt.AddWidget(self.window, self.layout)
@@ -39,23 +41,54 @@ class UnrealDocViewer(CaptureViewer):
 		"""
 		# noinspection PyBroadException
 		try:
+			#
+			Settings().load()
+
 			# Following the setup of different tools
 			from .tools.tool_scene_data import ToolSceneData
-			self.add_tool(ToolSceneData(context))
+			self.add_tool(ToolSceneData)
 
 			from .tools.tool_pass_analysis import ToolPassAnalysis
-			self.add_tool(ToolPassAnalysis(context))
+			self.add_tool(ToolPassAnalysis)
+			
+			from .tools.tool_mesh_draw_call import ToolMeshDrawCall
+			self.add_tool(ToolMeshDrawCall)
+
+			from .tools.tool_events_comparison import ToolEventsComparison
+			self.add_tool(ToolEventsComparison)
+
+			from .tools.tool_shader_analyzer import ToolShaderAnalyzer
+			self.add_tool(ToolShaderAnalyzer)
 
 			# ...
+
+			#
+			Settings().save()
 		except Exception as _e:
 			import traceback
 			UnrealDocViewerManager.message(context, traceback.format_exc())
 		pass
 
-	def add_tool(self, tool: ToolBase):
-		tool.finalize()
-		self._tools.append(tool)
-		self.mqt.AddWidget(self.layout, tool.root)
+	def add_tool(self, tool_cls: type):
+		#
+		assert(issubclass(tool_cls, ToolBase))
+
+		# Setting
+		settings = Settings().setdefault(ToolBase.SETTINGS_GROUP_NAME, {}).setdefault(
+			tool_cls.__name__,
+			{
+				"Enabled": True,
+				ToolBase.SETTINGS_CONFIG_NAME: {}
+			}
+		)
+
+		tool = tool_cls(self.context)
+
+		# Add Tools
+		if settings["Enabled"]:
+			tool.finalize()
+			self._tools.append(tool)
+			self.mqt.AddWidget(self.layout, tool.root)
 		pass
 
 	def show(self):
@@ -67,11 +100,15 @@ class UnrealDocViewer(CaptureViewer):
 		for tool in self._tools:
 			tdict = pdict.get(tool.__class__.__name__, {})
 			tool.load_layout(tdict)
+			is_collapsed = tdict.get("collapsed", False)
+			tool.collapse(is_collapsed)
 		pass
 
 	def save_layout(self, pdict: dict):
 		for tool in self._tools:
-			pdict[tool.__class__.__name__] = {}
+			pdict[tool.__class__.__name__] = {
+				"collapsed": tool.is_collapsed()
+			}
 			tool.save_layout(pdict[tool.__class__.__name__])
 		pass
 
@@ -182,4 +219,9 @@ class UnrealDocViewerManager(object):
 	@classmethod
 	def message(cls, context: CaptureContext, msg: str):
 		context.Extensions().MessageDialog(msg, "Debug")
+		pass
+
+	@classmethod
+	def open_settings_json(cls, context: CaptureContext, _data):
+		Utils().startfile(Settings().abs_filepath())
 		pass

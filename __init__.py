@@ -9,7 +9,7 @@ from .unrealdoc_window import UnrealDocViewerManager
 from .tools.struct_buffer_viewer_mgr import StructBufferViewerManager
 from .tools.utils import PipelineStateUtils
 
-DEBUG = False
+DEBUG = True
 
 
 def register(version: str, context: CaptureContext):
@@ -21,7 +21,8 @@ def register(version: str, context: CaptureContext):
     #
     UnrealDocViewerManager.version = version
     UnrealDocViewerManager.context = context
-    context.Extensions().RegisterWindowMenu(WindowMenu.Window, ["Unreal Toolbox"], UnrealDocViewerManager.open_window)
+    context.Extensions().RegisterWindowMenu(WindowMenu.Window, ["UnrealDoc"], UnrealDocViewerManager.open_window)
+    context.Extensions().RegisterWindowMenu(WindowMenu.Tools, ["Settings", "UnrealDoc"], UnrealDocViewerManager.open_settings_json)
     UnrealDocViewerManager.on_app_start()
     pass
 

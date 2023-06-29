@@ -11,7 +11,7 @@ from ..common.singleton import Singleton, Registerable
 
 # noinspection PyMethodMayBeStatic
 class Utils(object, metaclass=Singleton):
-	
+
 	def __init__(self):
 		super(Utils, self).__init__()
 		pass
@@ -41,6 +41,7 @@ class Utils(object, metaclass=Singleton):
 		return False
 
 
+# noinspection PyMethodMayBeStatic
 class PipelineStateUtils(Registerable, metaclass=Singleton):
 
 	def __init__(self):
@@ -55,6 +56,14 @@ class PipelineStateUtils(Registerable, metaclass=Singleton):
 
 	def find_readwrite_resource(self, state: renderdoc.PipeState, resource_name: str, stage: Optional[renderdoc.ShaderStage] = None) -> List[renderdoc.ResourceId]:
 		return self._internal_find_resources(resource_name, state.GetReadWriteResources, True, stage)
+
+	def get_root_signature_resource(self, state: renderdoc.PipeState) -> Optional[renderdoc.ResourceId]:
+		pipline_id = state.GetGraphicsPipelineObject()
+		pipeline_resource = self.context.GetResource(pipline_id)
+		for resource_id in pipeline_resource.parentResources:
+			if self.context.GetResourceName(resource_id).startswith("Root Signature"):
+				return resource_id
+		return None
 
 	def _internal_find_resources(self, resource_name: str, get_resource_lambda: callable, usedonly: bool, stage: renderdoc.ShaderStage) -> List[renderdoc.ResourceId]:
 		#
@@ -72,3 +81,23 @@ class PipelineStateUtils(Registerable, metaclass=Singleton):
 					if self.context.GetResourceName(resource.resourceId) == resource_name:
 						result.append(resource.resourceId)
 		return result
+
+
+# noinspection PyMethodMayBeStatic
+class OperatorUtils(Registerable, metaclass=Singleton):
+	from .operators import OperatorBase
+	from qrenderdoc import CaptureContext
+
+	def __init__(self):
+		super(OperatorUtils, self).__init__()
+		pass
+
+	def invoke_single_operator(self, context: CaptureContext, operator: OperatorBase):
+		operator.do_prepare(context, 0)
+		context.Replay().BlockInvoke(operator.do_invoke)
+		if operator.exception is not None:
+			msg = "Error while invoking %s:\n\n%s" % (operator.__class__.__name__, operator.exception)
+			context.Extensions().MessageDialog(msg, "Debug")
+		elif operator.invoked():
+			operator.do_post_invoked()
+		pass

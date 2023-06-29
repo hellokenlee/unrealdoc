@@ -9,6 +9,7 @@ from qrenderdoc import CaptureContext, MiniQtHelper
 from PySide2 import QtGui, QtCore, QtWidgets
 
 from .utils import Utils
+from .settings import Settings
 from .operators import OperatorBase
 
 
@@ -34,7 +35,7 @@ class ToolItem(object):
 		self.set_value(self._default)
 		pass
 
-	def get_value(self):
+	def get_value(self) -> str:
 		return self.mqt.GetWidgetText(self._value)
 
 	def set_value(self, value: str):
@@ -104,21 +105,49 @@ class ToolCustomButton(object):
 
 
 class ToolComboBoxItem(ToolItem):
-	def __init__(self, mqt: MiniQtHelper, label: str, combo_list: list):
-		self.combo = mqt.CreateComboBox(False, self.on_combo_box_change)
+	def __init__(self, mqt: MiniQtHelper, label: str, combo_list: list, callback: ToolInputItem.InputCallBack):
+		self.combo = mqt.CreateComboBox(True, self.on_combo_box_change)
 		super(ToolComboBoxItem, self).__init__(mqt, label, self.combo, combo_list[0])
 		self.mqt = mqt
 		self.mqt.SetComboOptions(self.combo, combo_list)
+		self._callback = callback
+		pass
+
+	def set_value(self, value: str):
+		self.freeze(True)
+		super().set_value(value)
+		self.mqt.SelectComboOption(self.combo, value)
+		self.freeze(False)
 		pass
 
 	def on_combo_box_change(self, context, widget, text):
 		self.set_value(text)
+		if not self._frozen:
+			if self._callback is not None:
+				self._callback(context, widget, text)
 		pass
 
+
+class ToolRadioBox(object):
+	def __init__(self, mqt: MiniQtHelper, label: str, default: bool):
+		super(ToolRadioBox, self).__init__()
+		self.mqt = mqt
+		self.root = self.mqt.CreateRadiobox(None)
+		self.mqt.SetWidgetText(self.root, label)
+		self.mqt.SetWidgetChecked(self.root, default)
+		pass
+
+	def get_checked_value(self):
+		return self.mqt.IsWidgetChecked(self.root)
+
+	def set_checked_value(self, value: bool):
+		return self.mqt.SetWidgetChecked(self.root, value)
 
 
 class ToolBase(object):
 
+	SETTINGS_GROUP_NAME = "Tools"
+	SETTINGS_CONFIG_NAME = "Configs"
 	WidgetClosedCallback = Callable[[QtWidgets.QWidget], None]
 
 	def __init__(self, context: CaptureContext):
@@ -128,6 +157,8 @@ class ToolBase(object):
 		self.root = self.mqt.CreateGroupBox(True)
 
 		#
+		self._num_inputs = 0
+		self._num_results = 0
 		self._spacer = False
 		self._mannual_eveluate = False
 		self._input_items: List[ToolInputItem] = []
@@ -137,26 +168,11 @@ class ToolBase(object):
 
 		self._input_label = self.mqt.CreateLabel()
 		self.mqt.SetWidgetText(self._input_label, "Inputs:")
-		self.mqt.AddWidget(self.root, self._input_label)
-
 		self._input_layout = self.mqt.CreateVerticalContainer()
-		self.mqt.AddWidget(self.root, self._input_layout)
-
 		self._result_label = self.mqt.CreateLabel()
-		self.mqt.AddWidget(self.root, self._result_label)
-
 		self._result_layout = self.mqt.CreateVerticalContainer()
 		self.mqt.SetWidgetText(self._result_label, "Results:")
-		self.mqt.AddWidget(self.root, self._result_layout)
-
 		self._custom_button_layout = self.mqt.CreateHorizontalContainer()
-		self.mqt.AddWidget(self.root, self._custom_button_layout)
-
-		button_spacer = self.mqt.CreateSpacer(True)
-		self.mqt.AddWidget(self._custom_button_layout, button_spacer)
-
-		root_spacer = self.mqt.CreateSpacer(False)
-		self.mqt.AddWidget(self.root, root_spacer)
 		pass
 
 	def set_title(self, title: str):
@@ -168,6 +184,7 @@ class ToolBase(object):
 		pass
 
 	def add_input(self, label: str, default: str, readonly=False, formatter: Optional[ToolInputItem.FormatterCallBack] = None):
+		self._num_inputs = self._num_inputs + 1
 		item = ToolInputItem(self.mqt, label, default, self.on_input_changed, formatter)
 		self.mqt.AddWidget(self._input_layout, item.root)
 		item.set_read_only(readonly)
@@ -175,6 +192,7 @@ class ToolBase(object):
 		return item
 
 	def add_result(self, label: str, default: str):
+		self._num_results = self._num_results + 1
 		item = ToolResultItem(self.mqt, label, default)
 		self.mqt.AddWidget(self._result_layout, item.root)
 		return item
@@ -184,11 +202,29 @@ class ToolBase(object):
 		self.mqt.AddWidget(self._custom_button_layout, button.root)
 		return button
 
-	def add_combo_box(self, label: str, combo_list: list):
-		combo_box = ToolComboBoxItem(self.mqt, label, combo_list)
+	def add_combo_box(self, label: str, combo_list: list, callback: ToolCustomButton.CustomButtonCallback = None):
+		combo_box = ToolComboBoxItem(self.mqt, label, combo_list, callback)
 		self.mqt.AddWidget(self._input_layout, combo_box.root)
 		return combo_box
 
+	def add_radio_box(self, label: str, default: bool):
+		radio_box = ToolRadioBox(self.mqt, label, default)
+		self.mqt.AddWidget(self._input_layout, radio_box.root)
+		return radio_box
+
+	@classmethod
+	def add_config(cls, key, default_value=""):
+		_cls = cls.__class__ if not isinstance(cls, type) else cls
+		if issubclass(_cls, ToolBase):
+			Settings()[_cls.SETTINGS_GROUP_NAME][_cls.__name__][_cls.SETTINGS_CONFIG_NAME].setdefault(key, default_value)
+		pass
+
+	@classmethod
+	def get_config(cls, key):
+		_cls = cls.__class__ if not isinstance(cls, type) else cls
+		if issubclass(_cls, ToolBase):
+			return Settings()[_cls.SETTINGS_GROUP_NAME][_cls.__name__][_cls.SETTINGS_CONFIG_NAME][key]
+		return ""
 
 	def save_layout(self, pdict: dict):
 		"""
@@ -235,15 +271,18 @@ class ToolBase(object):
 		"""
 		pass
 
-	def collapse(self):
-		"""
-		Hack for renderdoc's miniqt dont provide a method to collapse GroupBox
-		"""
+	def collapse(self, collapsed: bool):
+
+		# Hack for renderdoc's miniqt dont provide a method to collapse GroupBox
 		# Fake a click event
-		click_pos = QtCore.QPoint(11, 11)
-		event = QtGui.QMouseEvent(QtCore.QEvent.MouseButtonRelease, click_pos, QtCore.Qt.MouseButton.LeftButton, QtCore.Qt.MouseButtons(), QtCore.Qt.NoModifier)
-		QtCore.QCoreApplication.instance().notify(self.root, event)
+		# click_pos = QtCore.QPoint(11, 11)
+		# event = QtGui.QMouseEvent(QtCore.QEvent.MouseButtonRelease, click_pos, QtCore.Qt.MouseButton.LeftButton, QtCore.Qt.MouseButtons(), QtCore.Qt.NoModifier)
+		# QtCore.QCoreApplication.instance().notify(self.root, event)
+		self.mqt.SetWidgetChecked(self.root, collapsed)
 		pass
+
+	def is_collapsed(self):
+		return self.mqt.IsWidgetChecked(self.root)
 
 	def name(self, attrib: any) -> str:
 		"""
@@ -251,7 +290,26 @@ class ToolBase(object):
 		"""
 		return Utils().get_attribute_name(self, attrib)
 
+	def save_item(self, pdict: dict, attrib: ToolItem):
+		pdict[self.name(attrib)] = attrib.get_value()
+		pass
+
+	def load_item(self, pdict: dict, attrib: ToolItem, default: str):
+		attrib.set_value(pdict.get(self.name(attrib), default))
+		pass
+
 	def finalize(self):
+		root_spacer = self.mqt.CreateSpacer(False)
+		button_spacer = self.mqt.CreateSpacer(True)
+		if self._num_inputs > 0:
+			self.mqt.AddWidget(self.root, self._input_label)
+			self.mqt.AddWidget(self.root, self._input_layout)
+		if self._num_results > 0:
+			self.mqt.AddWidget(self.root, self._result_label)
+			self.mqt.AddWidget(self.root, self._result_layout)
+		self.mqt.AddWidget(self.root, self._custom_button_layout)
+		self.mqt.AddWidget(self._custom_button_layout, button_spacer)
+		self.mqt.AddWidget(self.root, root_spacer)
 		if self._spacer:
 			input_spacer = self.mqt.CreateSpacer(True)
 			result_spacer = self.mqt.CreateSpacer(True)

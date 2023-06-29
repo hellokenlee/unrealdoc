@@ -83,7 +83,7 @@ class OperatorBase(object):
 		"""
 		return True
 
-	def invoke(self, controller: ReplayController):
+	def invoke(self, controller: ReplayController) -> any:
 		"""
 		Do the operations to replay controller ( in another thread ), return the result latter might be get in UI.
 
