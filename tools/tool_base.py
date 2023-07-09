@@ -150,6 +150,8 @@ class ToolBase(object):
 	SETTINGS_CONFIG_NAME = "Configs"
 	WidgetClosedCallback = Callable[[QtWidgets.QWidget], None]
 
+	plugin_dir_path = ""
+
 	def __init__(self, context: CaptureContext):
 		super(ToolBase, self).__init__()
 		self.mqt = context.Extensions().GetMiniQtHelper()

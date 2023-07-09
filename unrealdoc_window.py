@@ -15,7 +15,7 @@ from .tools.tool_base import ToolBase
 
 class UnrealDocViewer(CaptureViewer):
 
-	def __init__(self, context: CaptureContext):
+	def __init__(self, context: CaptureContext, plugin_root_path: str):
 		super(UnrealDocViewer, self).__init__()
 
 		self.mqt = context.Extensions().GetMiniQtHelper()
@@ -23,8 +23,12 @@ class UnrealDocViewer(CaptureViewer):
 		self.window = self.mqt.CreateToplevelWidget("UnrealDoc", lambda c, w, d: UnrealDocViewerManager.on_window_closed())
 		self.context.AddCaptureViewer(self)
 		self.layout = self.mqt.CreateVerticalContainer()
+		self.plugin_root_path = plugin_root_path
 		self.mqt.AddWidget(self.window, self.layout)
 		self._tools: List[ToolBase] = []
+
+		#
+		ToolBase.plugin_dir_path = plugin_root_path
 
 		#
 		self.__inittools__(context)
@@ -144,7 +148,8 @@ class UnrealDocViewerManager(object):
 		if cls.instance is None:
 			shown = True
 			# Create new window instance
-			cls.instance = UnrealDocViewer(context)
+			plugin_root = os.path.dirname(os.path.abspath(__file__))
+			cls.instance = UnrealDocViewer(context, plugin_root)
 			cls.instance.load_layout(cls.instance_layout)
 			context.AddDockWindow(cls.instance.window, DockReference.RightOf, context.GetTextureViewer().Widget(), 0.05)
 		context.RaiseDockWindow(cls.instance.window)

@@ -14,6 +14,7 @@ from .tool_base import ToolBase
 from .utils import PipelineStateUtils
 
 from .shaderanalyzer.rootsignature import RootSignature
+from .shaderanalyzer.graphic_pipeline_state import GraphicPipelineStateObject
 
 
 class ShaderStageName(Enum):
@@ -43,9 +44,9 @@ class RGAMode(Enum):
 class ToolShaderAnalyzer(ToolBase):
 	ROOT_SIGNATURE_MACRO = "UnrealdocAutoGen"
 	ROOT_SIGNATURE_FILENAME = "UnrealdocRootSignature.rs.hlsl"
+	GPSO_FILENAME = "Unrealdoc.gpso"
 
 	RGA_PATH = "RadeonGpuAnalyzerExePath"
-	DXC_PATH = "DirectXShaderCompilerExePath"
 
 	shader_stage_map = {
 		ShaderStageName.Compute.value: renderdoc.ShaderStage.Compute,
@@ -57,10 +58,10 @@ class ToolShaderAnalyzer(ToolBase):
 		super(ToolShaderAnalyzer, self).__init__(*args)
 		#
 		self._temp_dir = tempfile.gettempdir()
-		self._temp_dir = "C:\\Users\\gzlixiaoliang\\Desktop\\ShaderPlay\\"
+		# Debug Temp Path
+		# self._temp_dir = "C:\\Users\\gzlixiaoliang\\Desktop\\ShaderPlay\\"
 		#
-		self.add_config(self.RGA_PATH)
-		self.add_config(self.DXC_PATH)
+		self.add_config(self.RGA_PATH, os.path.join(self.plugin_dir_path, "_bin_", "rga", "rga.exe"))
 		#
 		self.set_title("Shader Analyzer")
 		self._mode = self.add_combo_box("Mode", [e.value for e in RGAMode])
@@ -75,7 +76,7 @@ class ToolShaderAnalyzer(ToolBase):
 	def eveluate(self):
 		#
 		dxcarg_fileptah = self._write_temp_dxc_arg()
-		source_filepath = self._write_temp_hlsl_source()
+		source_filepath = self._write_temp_hlsl_source(self._shader_stage.get_value())
 		rootsig_filepath = self._write_temp_root_sig_source()
 		#
 		out_isa_filepath = os.path.join(self._temp_dir, "isa.txt")
@@ -107,14 +108,34 @@ class ToolShaderAnalyzer(ToolBase):
 				dxc_arg = "--dxc-opt-file %s" % dxcarg_fileptah
 				#
 				rootsig_arg = "--rs-macro %s --rs-macro-version rootsig_1_1 --rs-hlsl %s" % (self.ROOT_SIGNATURE_MACRO, rootsig_filepath)
+				# Additional Parameter For Graphics Pipeline
+				is_vertex_stage = ShaderStageName.Vertex.value == self._shader_stage.get_value()
+				is_pixel_stage = ShaderStageName.Pixel.value == self._shader_stage.get_value()
+				is_graphics_pipeline = is_pixel_stage or is_vertex_stage
+				gpso_arg = ""
+				if is_graphics_pipeline:
+					gpso_filepath = self._write_temp_gpso_source()
+					gpso_arg = "--gpso %s" % gpso_filepath
+				opt_source_arg = ""
+				if is_pixel_stage:
+					# We need to dump vertex shader when we are analysising pixel shader
+					opt_source_filepath = self._write_temp_hlsl_source("vs")
+					opt_source_arg = "--vs {0} --vs-entry {1} --vs-model vs_{2}".format(
+						opt_source_filepath,
+						self._get_shader_entry("vs"),
+						self._shader_model.get_value()
+					)
+				#
 				command = [
 					self.get_config(self.RGA_PATH),
 					rhi_arg,
 					asic_arg,
 					source_arg,
+					opt_source_arg,
 					dxc_arg,
 					rootsig_arg,
-					mode_arg
+					gpso_arg,
+					mode_arg,
 				]
 				print("RGA Run: %s" % " ".join(command))
 				result = subprocess.run(" ".join(command), stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, shell=True)
@@ -161,7 +182,7 @@ class ToolShaderAnalyzer(ToolBase):
 		self.load_item(pdict, self._asic, "")
 		pass
 
-	def on_change_shader_stage(self, context, widget, text):
+	def on_change_shader_stage(self, _context, _widget, _text):
 		self._refresh_shader_infos()
 		pass
 
@@ -186,15 +207,17 @@ class ToolShaderAnalyzer(ToolBase):
 			fp.write(self._compiler_args.get_value())
 		return dxc_arg_filepath
 
-	def _write_temp_hlsl_source(self) -> str:
+	def _write_temp_hlsl_source(self, stage_str: str) -> str:
 		state = self.context.CurPipelineState()
-		stage = self.shader_stage_map[self._shader_stage.get_value()]
+		stage = self.shader_stage_map[stage_str]
 		reflection = state.GetShaderReflection(stage)
 		if reflection is not None:
 			name: str = reflection.debugInfo.files[0].filename
 			source: str = reflection.debugInfo.files[0].contents
-			if not name.endswith(".hlsl"):
-				name = name + ".hlsl"
+			if name.endswith(".hlsl"):
+				name = name[0:-5]
+			name = name + (".%s" % stage_str)
+			name = name + ".hlsl"
 			filepath = os.path.join(self._temp_dir, name)
 			with open(filepath, "w") as fp:
 				fp.write(source)
@@ -209,6 +232,14 @@ class ToolShaderAnalyzer(ToolBase):
 			root_sig = RootSignature(self.context, self.context.GetResource(root_sig_resource))
 			filepath = os.path.join(self._temp_dir, self.ROOT_SIGNATURE_FILENAME)
 			root_sig.dump(self.ROOT_SIGNATURE_MACRO, filepath)
+		return filepath
+
+	def _write_temp_gpso_source(self) -> str:
+		filepath = "C://ErrorOnGenerateGraphicPipelineObject"
+		if self.context.CurPipelineState() is not None:
+			gpso = GraphicPipelineStateObject(self.context, self.context.CurPipelineState())
+			filepath = os.path.join(self._temp_dir, self.GPSO_FILENAME)
+			gpso.dump(filepath)
 		return filepath
 
 	def _get_actual_output_filepath(self, mode, arg_filepath) -> str:
@@ -244,3 +275,10 @@ class ToolShaderAnalyzer(ToolBase):
 		else:
 			self._shader_entry.set_value("")
 		pass
+
+	def _get_shader_entry(self, stage_str) -> str:
+		state = self.context.CurPipelineState()
+		reflection = state.GetShaderReflection(self.shader_stage_map[stage_str])
+		if reflection is not None:
+			return reflection.entryPoint
+		return ""
